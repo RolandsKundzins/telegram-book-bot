@@ -1,0 +1,19 @@
+# Supabase CLI cache and metadata
+supabase/.supabase/
+supabase/.temp/
+supabase/.branches/
+
+**/.env
+
+# Node.js dependencies (if you use them inside functions)
+**/node_modules
+
+# Build artifacts (if any build step is used)
+/**/dist/
+/**/.output/
+
+# Local development files
+.vscode/
+.idea/
+
+*.log
