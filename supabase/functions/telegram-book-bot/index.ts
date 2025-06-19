@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { sendTelegramMessage} from "./telegramUtils.ts";
 
 Deno.serve(async (req) => {
   const body = await req.json();
@@ -6,19 +7,11 @@ Deno.serve(async (req) => {
   const chatId = body.message?.chat?.id;
   const text = body.message?.text;
 
-  const reply = `You said: ${text}`;
+  const reply = `You definetly said: ${text}`;
 
   console.log(`Received message from chat ${chatId}: ${text}`);
 
-//   Send message back to Telegram
-  await fetch(`https://api.telegram.org/bot${Deno.env.get("BOT_TOKEN")}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: reply,
-    }),
-  });
+  await sendTelegramMessage(chatId, reply, Deno.env.get("BOT_TOKEN")!);
 
   return new Response("OK");
 });
