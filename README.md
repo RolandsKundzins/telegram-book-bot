@@ -1,3 +1,10 @@
+Vajadzētu saprast kā to key var dabūt.
+Šķiet, ka viņu varētu extractot no URL, bet varbūt arī kā citādi.
+Vai var bez viņa iztikt?
+
+curl -L -o book.epub "libgen.li/get.php?md5=f29b82e6bb143bdc55defd4980567e81&key=QTHX4MKZJ0EK2I1U"
+
+
 # Telegram Book Bot on Supabase Edge Functions
 
 A Telegram bot that querries a book library API. 
