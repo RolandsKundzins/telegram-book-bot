@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "deploy": "npx supabase functions deploy telegram-book-bot --no-verify-jwt"
+  },
   "devDependencies": {
     "supabase": "^2.26.9"
   }

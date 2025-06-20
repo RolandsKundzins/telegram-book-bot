@@ -21,8 +21,8 @@ A project demonstrating how to use Supabase Edge Functions with Docker and the S
 - Serving functions locally `npx supabase functions serve`:
     - This will most likely fail because telegram cannot access your local machine. For testing you can also just deploy the function to Supabase
     - But you can test with Curl/Postman
-- Set secrets in Supabase from .env: `npx supabase secrets set --env-file supabase/.env`
-- Deploy the function to Supabase: `npx supabase functions deploy telegram-book-bot`
+- Set secrets in Supabase remote from you local .env: `npx supabase secrets set --env-file .env`
+- Deploy the function to Supabase: `npx supabase functions deploy telegram-book-bot --no-verify-jwt`
 
 ## Extra commands
 
