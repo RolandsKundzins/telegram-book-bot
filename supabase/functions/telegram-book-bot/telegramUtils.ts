@@ -15,3 +15,14 @@ export async function sendTelegramMessage(chatId: number, text: string) {
     }),
   });
 }
+
+export async function sendTelegramDocument(chatId: number, filename: string, fileData: Uint8Array) {
+  const formData = new FormData();
+  formData.append("chat_id", chatId.toString());
+  formData.append("document", new Blob([fileData]), filename);
+
+  await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+    method: "POST",
+    body: formData,
+  });
+}

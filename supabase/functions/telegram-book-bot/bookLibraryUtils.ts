@@ -101,3 +101,35 @@ export function formatBooksMarkdown(book: any ): string {
     `[Cover Image](${book.imgUrl})`
   ].join('\n');
 }
+
+
+export async function getLibgenDownloadUrl(md5: string): Promise<string | null> {
+  const url = `https://libgen.li/get.php?md5=${md5}`;
+
+  const response = await fetch(url);
+  const html = await response.text();
+
+  // Find the first link that contains "get.php"
+  console.log("HTML response from libgen:", html);
+  const match = html.match(/href="(get\.php\?[^"]+)"/i);
+
+  if (match) {
+    return `https://libgen.li/${match[1]}`;
+  }
+
+  return null;
+}
+
+
+export async function downloadBookFile(url: string): Promise<Uint8Array> {
+  const response = await fetch(url, {
+    redirect: "follow" // follow HTTP 3xx redirects, default is 'follow' but explicit here
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download book: ${response.status} ${response.statusText}`);
+  }
+
+  const data = new Uint8Array(await response.arrayBuffer());
+  return data;
+}
