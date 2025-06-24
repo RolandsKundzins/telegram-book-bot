@@ -98,57 +98,54 @@ export async function getLibgenDownloadUrl(md5: string): Promise<string | null> 
 }
 
 
-
-function calculateDownloadProgress(loaded: number, total: number) {
-  const percent = Math.floor((loaded / total) * 100);
-  const loadedMB = (loaded / (1024 * 1024)).toFixed(2);
+function formatDownloadProgress(percent: number, offset: number, total: number): string {
+  const downloadedMB = (offset / (1024 * 1024)).toFixed(2);
   const totalMB = (total / (1024 * 1024)).toFixed(2);
-  return { percent, loadedMB, totalMB };
+  return `Download progress: *${(percent * 100).toFixed(0)}%* (${downloadedMB} / ${totalMB} MB)`;
 }
 
-function concatChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
-  const data = new Uint8Array(totalLength);
-  let position = 0;
-  for (const chunk of chunks) {
-    data.set(chunk, position);
-    position += chunk.length;
-  }
-  return data;
-}
-
-export async function downloadBookFileWithTelegramProgress(chatId: number, url: string) {
+export async function downloadBookFileWithProgress(chatId: number, url: string): Promise<Uint8Array> {
   const initialMessageId = await sendTelegramMessage(chatId, "Starting download...");
 
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok || !response.body) throw new Error("Failed to download");
 
-  const contentLength = response.headers.get('content-length')!;
+  const contentLength = response.headers.get('content-length');
+  if (!contentLength) {
+    await sendTelegramMessage(chatId, "Unknown file size — downloading without progress...");
+    const data = new Uint8Array(await response.arrayBuffer());
+    await editTelegramMessage(chatId, initialMessageId, "Download complete ✅");
+    return data;
+  }
+
   const total = parseInt(contentLength, 10);
-  let loaded = 0;
+  if (total > 50_000_000) {
+    await sendTelegramMessage(chatId, "File too large (>50MB) to download.");
+    throw new Error("File too large");
+  }
 
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const result = new Uint8Array(total);
+  let offset = 0;
 
-  let lastUpdate = 0;
+  let lastUpdate = Date.now();
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    chunks.push(value);
-    loaded += value.length;
+    result.set(value, offset);
+    offset += value.length;
 
     const now = Date.now();
-    if (now - lastUpdate <= 500) {
-      continue; // Update progress every 500ms
+    if (now - lastUpdate >= 1200) {
+      lastUpdate = now;
+      const percent = offset / total;
+      const msg = formatDownloadProgress(percent, offset, total);
+      editTelegramMessage(chatId, initialMessageId, msg); // don't await this to avoid blocking
     }
-    lastUpdate = now;
-
-    const { percent, loadedMB, totalMB } = calculateDownloadProgress(loaded, total);
-    await editTelegramMessage(chatId, initialMessageId, `Download progress: *${percent}%* (${loadedMB} / ${totalMB} MB)`);
   }
 
-  const data = concatChunks(chunks, loaded);
   await editTelegramMessage(chatId, initialMessageId, "Download complete ✅");
-  return data;
+  return result;
 }

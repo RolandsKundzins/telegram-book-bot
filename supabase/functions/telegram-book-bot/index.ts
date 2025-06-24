@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { sendTelegramMessage, sendTelegramDocument, sendTelegramAnimation } from "./telegramUtils.ts";
-import { searchAnnasArchive, formatBooksMarkdown, getLibgenDownloadUrl, downloadBookFileWithTelegramProgress } from "./bookLibraryUtils.ts";
+import { searchAnnasArchive, formatBooksMarkdown, getLibgenDownloadUrl, downloadBookFileWithProgress } from "./bookLibraryUtils.ts";
 import { sendEmail } from "./emailUtils.ts";
 import { GIFS_OF_DOWNLOAD } from "./constants.ts";
 
@@ -44,7 +44,7 @@ async function handleDownloadRequest(chatId: number, message: string) {
   }
 
   await sendTelegramAnimation(chatId, GIFS_OF_DOWNLOAD[Math.floor(Math.random() * GIFS_OF_DOWNLOAD.length)]);
-  const bookData = await downloadBookFileWithTelegramProgress(chatId, downloadLink);
+  const bookData = await downloadBookFileWithProgress(chatId, downloadLink);
 
   await sendTelegramMessage(chatId, `Uploading to Telegram...`);
   const filename = `${bookId}.epub`;
