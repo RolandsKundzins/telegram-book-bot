@@ -1,7 +1,9 @@
 # Telegram Book Bot on Supabase Edge Functions
 
-A Telegram bot that querries a book library API. 
-The user can pick a book to automatically be added to pocketbook cloud.
+A Telegram bot that querries a book library API like LibGen (Library Genesis). 
+In two steps:
+1. User can search for a book
+2. User can upload one of the books to pocketbook cloud using book id.
 
 A project demonstrating how to use Supabase Edge Functions with Docker and the Supabase CLI.
 

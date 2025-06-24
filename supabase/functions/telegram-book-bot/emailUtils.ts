@@ -12,7 +12,7 @@ function encodeBase64(data: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function sendEmail(to: string, subject: string, fileName: string, fileData: Uint8Array): Promise<void> {
+export async function sendEmail(to: string, fileName: string, fileData: Uint8Array): Promise<void> {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -20,9 +20,9 @@ export async function sendEmail(to: string, subject: string, fileName: string, f
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: 'onboarding@resend.dev', // TODO: Need to use my actual email address here
+      from: 'pb@fulfily.eu',
       to,
-      subject,
+      subject: "Book upload",
       html: 'Book that is uploaded to Pocketbook using "send to Pocketbook" feature',
       attachments: [
       {

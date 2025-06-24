@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { sendTelegramMessage, sendTelegramDocument } from "./telegramUtils.ts";
+import { sendTelegramMessage, sendTelegramDocument, sendTelegramDownloadAnimation } from "./telegramUtils.ts";
 import { searchAnnasArchive, formatBooksMarkdown, getLibgenDownloadUrl, downloadBookFile } from "./bookLibraryUtils.ts";
 import { sendEmail } from "./emailUtils.ts";
 
@@ -39,22 +39,18 @@ async function handleDownloadRequest(chatId: number, message: string) {
     return;
   }
 
-  await sendTelegramMessage(chatId, `Downloading book...\nThis may take a few minutes`); // TODO: maybe add progress msges
+  await sendTelegramMessage(chatId, `Downloading book...\nThis may take a few minutes`);
+  await sendTelegramDownloadAnimation(chatId);
 
   const filename = `${bookId}.epub`;
   const bookData = await downloadBookFile(downloadLink);
 
   await sendTelegramMessage(chatId, `Book downloaded. Uploading to Telegram...`);
   await sendTelegramDocument(chatId, filename, bookData);
-  // await sendTelegramMessage(chatId, `Enjoy your book! 📚`);
 
   await sendTelegramMessage(chatId, `Uploading book to Pocketbook via "send to Pocketbook" feature... 📤`);
-  try {
-    await sendEmail("rolands.kungs@pbsync.com", "Title of email", filename, bookData);  // TODO: Need to use my actual email address here
-    await sendTelegramMessage(chatId, `Book successfully sent to Pocketbook! ✉️\nTap "Sync" on your Pocketbook to access it.`);
-  } catch (_error) {
-    await sendTelegramMessage(chatId, "⚠️ Uh-oh! It looks like the bot can't send the book to Pocketbook. \nPlease check your email and allow the bot to send to Pocketbook. ⚠️");
-  }
+  await sendEmail("rolands.kungs@pbsync.com", filename, bookData);
+  await sendTelegramMessage(chatId, `Book sent to pocketbook via email.\n⚠️ For first time - please check your email for message from "no-reply@pbsync.com" and add pb@fulfily.eu to trusted senders, otherwise you will not receive the book!\n\nTap sync on your Pocketbook and book will be there!\nHappy reading 📖`);
 }
 
 
