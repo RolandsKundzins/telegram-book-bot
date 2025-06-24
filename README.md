@@ -6,6 +6,7 @@ In two steps:
 2. User can upload one of the books to pocketbook cloud using book id.
 
 A project demonstrating how to use Supabase Edge Functions with Docker and the Supabase CLI.
+It also uses Resend to send emails. Resend uses fulfily.eu domain for sending emails, which is configured in cloudflare.
 
 ## Prerequisites
 

@@ -1,28 +1,32 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { sendTelegramMessage, sendTelegramDocument, sendTelegramDownloadAnimation } from "./telegramUtils.ts";
-import { searchAnnasArchive, formatBooksMarkdown, getLibgenDownloadUrl, downloadBookFile } from "./bookLibraryUtils.ts";
+import { sendTelegramMessage, sendTelegramDocument, sendTelegramAnimation } from "./telegramUtils.ts";
+import { searchAnnasArchive, formatBooksMarkdown, getLibgenDownloadUrl, downloadBookFileWithTelegramProgress } from "./bookLibraryUtils.ts";
 import { sendEmail } from "./emailUtils.ts";
+import { GIFS_OF_DOWNLOAD } from "./constants.ts";
+
 
 Deno.serve(async (req) => {
   const body = await req.json();
-  const chatId = body.message?.chat?.id;
-  const message = body.message?.text;
+  const chatId = body.message.chat.id;
+  const message = body.message.text;
 
   console.log(`Received message from chat ${chatId}: ${message}`);
   
-  try {
-    if (message.toLowerCase().startsWith("id:")) { // STEP 2 - download book
-      await handleDownloadRequest(chatId, message);
-    } else { // STEP 1 - search for books
-      await handleSearchRequest(chatId, message);
+  (async () => {
+    try {
+      if (message.toLowerCase().startsWith("id:")) { // STEP 2 - download book
+        await handleDownloadRequest(chatId, message);
+      } else { // STEP 1 - search for books
+        await handleSearchRequest(chatId, message);
+      }
+    } catch (error) {
+      await sendTelegramMessage(chatId, `An error occured. Try again later.`);
+      console.error("Error handling request:", error);
     }
-  
-    return new Response("OK");
-  } catch (error) {
-    await sendTelegramMessage(chatId, `An error occured. Try again later.`);
-    console.error("Error handling request:", error);
-    return new Response("OK"); // Return OK to avoid Telegram retries
-  }
+  })(); // IIFE - Immediately Invoked Function Expression to handle async operations
+
+  // Early return to Telegram to avoid timeout issues
+  return new Response("OK"); // Always OK to avoid Telegram retries
 });
 
 
@@ -39,18 +43,16 @@ async function handleDownloadRequest(chatId: number, message: string) {
     return;
   }
 
-  await sendTelegramMessage(chatId, `Downloading book...\nThis may take a few minutes`);
-  await sendTelegramDownloadAnimation(chatId);
+  await sendTelegramAnimation(chatId, GIFS_OF_DOWNLOAD[Math.floor(Math.random() * GIFS_OF_DOWNLOAD.length)]);
+  const bookData = await downloadBookFileWithTelegramProgress(chatId, downloadLink);
 
+  await sendTelegramMessage(chatId, `Uploading to Telegram...`);
   const filename = `${bookId}.epub`;
-  const bookData = await downloadBookFile(downloadLink);
-
-  await sendTelegramMessage(chatId, `Book downloaded. Uploading to Telegram...`);
   await sendTelegramDocument(chatId, filename, bookData);
 
   await sendTelegramMessage(chatId, `Uploading book to Pocketbook via "send to Pocketbook" feature... 📤`);
   await sendEmail("rolands.kungs@pbsync.com", filename, bookData);
-  await sendTelegramMessage(chatId, `Book sent to pocketbook via email.\n⚠️ For first time - please check your email for message from "no-reply@pbsync.com" and add pb@fulfily.eu to trusted senders, otherwise you will not receive the book!\n\nTap sync on your Pocketbook and book will be there!\nHappy reading 📖`);
+  await sendTelegramMessage(chatId, `Book sent to pocketbook via email.\n⚠️On first time⚠️ - please check your email for message from "no-reply@pbsync.com" and accept pb@fulfily.eu as trusted sender.\n\nTap sync on your Pocketbook to retrieve the book!\nHappy reading 📖`);
 }
 
 

@@ -1,59 +1,36 @@
-const examplePayload = {
-  "total": 10,
-  "books": [
-    {
-      "title": "Never finished : unshackle your mind and win the war within",
-      "author": "David Goggins",
-      "md5": "904c6689b58c08a4eb1c8f2f0432826b",
-      "imgUrl": "https://s3proxy.cdn-zlib.sk//covers299/collections/userbooks/6ffabb65f5f2d480be489286548fe0b2ed1fa3023375d9a097254435e4ed6eba.jpg",
-      "size": "17.3MB",
-      "genre": "Unknown",
-      "format": "pdf",
-      "year": "2022",
-      "imgFallbackColor": null,
-      "sources": [
-        "zlib"
-      ]
-    },
-    {
-      "title": "Never Finished: Unshackle Your Mind and Win the War Within",
-      "author": "David Goggins",
-      "md5": "1f3e3b56f3ee5d8dfab242ce25e28007",
-      "imgUrl": "https://s3proxy.cdn-zlib.sk//covers299/collections/userbooks/e7c7daf5417db9c66b68d4d03d82372372f311c4940d06da124ece4a431e2a6f.jpg",
-      "size": "4.5MB",
-      "genre": "Unknown",
-      "format": "azw3",
-      "year": "2022",
-      "imgFallbackColor": null,
-      "sources": [
-        "zlib"
-      ]
-    },
-    {
-      "title": "Never Finished: A small town opposites attract romance",
-      "author": "Ana Rhodes",
-      "md5": "1ad689f4c1d6585f845dbb30a00c6ec1",
-      "imgUrl": "https://s3proxy.cdn-zlib.sk//covers299/collections/userbooks/40ed419f392e310e7e6467a5a1e7ddce79a57c108fb7be275e77ca6a5c6d8962.jpg",
-      "size": "0.7MB",
-      "genre": "Unknown",
-      "format": "pdf",
-      "year": "2024",
-      "imgFallbackColor": null,
-      "sources": [
-        "zlib"
-      ]
-    },
-  ]
+import { sendTelegramMessage, editTelegramMessage } from "./telegramUtils.ts";
+import { ANNAS_ARCHIVE_TEST_RESPONSE } from "./constants.ts";
+
+
+function parseSizeMB(sizeStr: string): number {
+  // Supports "MB", "GB", "KB"
+  const match = sizeStr.match(/^([\d.]+)\s*(KB|MB|GB)$/i);
+  if (!match) return 0;
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  if (unit === "GB") return value * 1024;
+  if (unit === "MB") return value;
+  if (unit === "KB") return value / 1024;
+  return 0;
 }
 
+function filterBooksBySize(books: any[], maxMB: number) {
+  books.forEach(book => {
+    const bookSizeMB = parseSizeMB(book.size)
+    if(bookSizeMB > maxMB) {
+      console.warn(`Book "${book.title}" exceeds size limit: ${bookSizeMB}`);
+      book.size = "Book size exceeds limit";
+      book.md5 = "Cannot download";
+    }
+  })
+}
 
 // find Book
 export async function searchAnnasArchive(
   query: string, // eg title, author, isbn.
-  // options: {  }  // you could allow user to set them
 ) {  
   if(query == "test") {
-    return examplePayload;
+    return ANNAS_ARCHIVE_TEST_RESPONSE;
   }
 
   const rapidApiKey = Deno.env.get("RAPID_API_KEY");
@@ -63,10 +40,10 @@ export async function searchAnnasArchive(
 
   const params = new URLSearchParams({
     q: query,
-    limit: String(3),
+    limit: String(4),
     ext: "epub", // FileType also: mobi, azw3
     sort: "mostRelevant", // [newest, largest, oldest, smallest, mostRelevant]
-    lang: "en",
+    // lang: "en",
     source: "lgli" // (libgen, libgenLi, zlib etc.)
     // You can also set: cat (category), skip 
   });
@@ -83,22 +60,22 @@ export async function searchAnnasArchive(
     throw new Error(`Annas Archive API error: ${res.status} ${res.statusText}`);
   }
 
-  return await res.json();
+  const data = await res.json();
+  filterBooksBySize(data.books, 30);
+  return data;
 }
 
 
 export function formatBooksMarkdown(book: any ): string {
-  if (!book) {
-    return 'error occured';
-  }
+  if (!book) return 'error occured';
 
   return [
     `*${book.title}*`,
     `_Author:_ ${book.author}`,
-    `_Book ID:_ \`${book.md5}\``,
     `_Format:_ ${book.format} | _Year:_ ${book.year}`,
-    `_Sources:_ ${book.sources.join(", ")}`,
-    `[Cover Image](${book.imgUrl})`
+    `_Size:_ ${book.size}`,
+    `_Book ID:_ \`${book.md5}\``,
+    `[img](${book.imgUrl})`
   ].join('\n');
 }
 
@@ -110,7 +87,7 @@ export async function getLibgenDownloadUrl(md5: string): Promise<string | null> 
   const html = await response.text();
 
   // Find the first link that contains "get.php"
-  console.log("HTML response from libgen:", html);
+  console.log("Getting LibGen page HTML to retrieve download url:", html);
   const match = html.match(/href="(get\.php\?[^"]+)"/i);
 
   if (match) {
@@ -121,15 +98,57 @@ export async function getLibgenDownloadUrl(md5: string): Promise<string | null> 
 }
 
 
-export async function downloadBookFile(url: string): Promise<Uint8Array> {
-  const response = await fetch(url, {
-    redirect: "follow" // follow HTTP 3xx redirects, default is 'follow' but explicit here
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to download book: ${response.status} ${response.statusText}`);
+
+function calculateDownloadProgress(loaded: number, total: number) {
+  const percent = Math.floor((loaded / total) * 100);
+  const loadedMB = (loaded / (1024 * 1024)).toFixed(2);
+  const totalMB = (total / (1024 * 1024)).toFixed(2);
+  return { percent, loadedMB, totalMB };
+}
+
+function concatChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
+  const data = new Uint8Array(totalLength);
+  let position = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, position);
+    position += chunk.length;
+  }
+  return data;
+}
+
+export async function downloadBookFileWithTelegramProgress(chatId: number, url: string) {
+  const initialMessageId = await sendTelegramMessage(chatId, "Starting download...");
+
+  const response = await fetch(url, { redirect: "follow" });
+  if (!response.ok || !response.body) throw new Error("Failed to download");
+
+  const contentLength = response.headers.get('content-length')!;
+  const total = parseInt(contentLength, 10);
+  let loaded = 0;
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+
+  let lastUpdate = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    chunks.push(value);
+    loaded += value.length;
+
+    const now = Date.now();
+    if (now - lastUpdate <= 500) {
+      continue; // Update progress every 500ms
+    }
+    lastUpdate = now;
+
+    const { percent, loadedMB, totalMB } = calculateDownloadProgress(loaded, total);
+    await editTelegramMessage(chatId, initialMessageId, `Download progress: *${percent}%* (${loadedMB} / ${totalMB} MB)`);
   }
 
-  const data = new Uint8Array(await response.arrayBuffer());
+  const data = concatChunks(chunks, loaded);
+  await editTelegramMessage(chatId, initialMessageId, "Download complete ✅");
   return data;
 }

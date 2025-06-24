@@ -20,7 +20,7 @@ export async function sendEmail(to: string, fileName: string, fileData: Uint8Arr
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: 'pb@fulfily.eu',
+      from: 'temp@fulfily.eu', ///////  CHANGE BACK TO pb@fulfily.eu
       to,
       subject: "Book upload",
       html: 'Book that is uploaded to Pocketbook using "send to Pocketbook" feature',
